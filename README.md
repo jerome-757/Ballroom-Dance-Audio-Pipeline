@@ -84,7 +84,7 @@ cd Ballroom-Dance-Audio-Pipeline
 # 3. 安装依赖
 pip install -r requirements.txt
 # 4. 运行程序
-python dance_arrangement.py
+python dance_arrangement_main.py
 ```
 
 # 使用说明
