@@ -1,0 +1,24 @@
+{
+  "name": "@p-stack/oss-kit",
+  "description": "A modern, lightweight GitHub template with essential open-source configurations for p-stack organization projects",
+  "keywords": [
+    "template",
+    "typescript",
+    "open-source",
+    "github-template",
+    "p-stack",
+    "modern-tooling",
+    "conventional-commits",
+    "repository-template"
+  ],
+  "scripts": {
+    "format": "prettier --write \"**/*.{ts,tsx,md}\""
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2"
+  },
+  "packageManager": "pnpm@9.0.0",
+  "engines": {
+    "node": ">=22"
+  }
+}
