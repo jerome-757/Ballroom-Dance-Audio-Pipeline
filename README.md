@@ -1,8 +1,13 @@
-# oss-kit
+![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Python](https://img.shields.io/badge/python-3.9+-blue)
+![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Mac-lightgrey)
+
+# Ballroom-Dance-Audio-Pipeline
 
 English | [한국어](README.ko.md)
 
-**oss-kit** is a [GitHub Template Repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-template-repository) designed to help you kickstart new open-source projects.  
+**Ballroom-Dance-Audio-Pipeline** is a [GitHub Template Repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-template-repository) designed to help you kickstart new open-source projects.  
 
 This template reduces the **boilerplate setup required at the beginning of a project** and provides essential configurations to quickly set up a well-structured open-source repository.  
 
@@ -33,7 +38,7 @@ When starting a new open-source project, there are several setup tasks required 
 For example: Issue Templates, Pull Request Templates, Code of Conduct, Contribution Guide, branch rules, and commit conventions all need to be configured manually.  
 
 This process is repetitive, time-consuming, and often inconsistent across projects.  
-**oss-kit** solves this by providing a ready-to-use template that ensures consistent and modern project initialization for anyone starting an open-source repository.
+**Ballroom-Dance-Audio-Pipeline** solves this by providing a ready-to-use template that ensures consistent and modern project initialization for anyone starting an open-source repository.
 
 ---
 
