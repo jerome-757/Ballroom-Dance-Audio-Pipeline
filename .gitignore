@@ -4,6 +4,10 @@
 node_modules
 .pnp
 .pnp.js
+.venv/
+env/
+venv/
+vendor/
 
 # Local env files
 .env
@@ -11,6 +15,7 @@ node_modules
 .env.development.local
 .env.test.local
 .env.production.local
+*.key
 
 # Testing
 coverage
@@ -26,12 +31,20 @@ coverage
 out/
 build
 dist
+dist/
+build/
+out/
+*.class
+*.pyc
+*.o
 
-
-# Debug
+# Debug and temporary
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+*.log
+*.tmp
+Thumbs.db
 
 # Misc
 .DS_Store
@@ -39,3 +52,73 @@ yarn-error.log*
 
 # Local settings
 settings.local.json
+
+# IDE configuration person
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Large file
+*.zip
+*.tar.gz
+*.7z
+
+
+
+# ===== 指定的排除项 =====
+failed_files.json
+processing.log
+speech_cache/
+
+# ===== 只传文件夹名，不传内容 =====
+A_待整理音乐/*
+A_已整理音乐/*
+B_output_mp3/*
+C_裁剪输出/*
+D_output/*
+
+# 但保留文件夹本身（Git会自动保留空目录结构）
+!A_待整理音乐/.gitkeep
+!A_已整理音乐/.gitkeep
+!B_output_mp3/.gitkeep
+!C_裁剪输出/.gitkeep
+!D_output/.gitkeep
+
+# ===== Python通用忽略 =====
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.log
+
+# ===== 敏感信息 =====
+.env
+*.key
+*.pem
+
+# ===== 系统文件 =====
+.DS_Store
+Thumbs.db
+
+# ===== IDE =====
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ===== 大文件 =====
+*.mp3
+# 但单独允许这个文件上传
+!D_motion_outro-bgm.mp3
+*.wav
+*.flac
+*.zip
+*.rar
+*.7z

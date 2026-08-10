@@ -1,0 +1,5 @@
+edge_tts==7.2.8
+gTTS==2.5.4
+mutagen==1.48.1
+pandas==2.3.0
+pyttsx3==2.99
