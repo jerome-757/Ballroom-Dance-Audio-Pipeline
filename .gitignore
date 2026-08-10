@@ -72,11 +72,11 @@ processing.log
 speech_cache/
 
 # ===== 只传文件夹名，不传内容 =====
-A_待整理音乐/*
-A_已整理音乐/*
-B_output_mp3/*
-C_裁剪输出/*
-D_output/*
+A_待整理音乐/
+A_已整理音乐/
+B_output_mp3/
+C_裁剪输出/
+D_output/
 
 # 但保留文件夹本身（Git会自动保留空目录结构）
 !A_待整理音乐/.gitkeep
