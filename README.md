@@ -1,15 +1,16 @@
 ![Version](https://img.shields.io/badge/version-1.0.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
-![Python](https://img.shields.io/badge/python-3.6+-blue)
+![Python](https://img.shields.io/badge/python-3.8+-blue)
 ![Tkinter](https://img.shields.io/badge/Tkinter-GUI-green.svg)
 ![Status](https://img.shields.io/badge/status-active-brightgreen.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Mac-lightgrey)
+[![捐赠支持](https://img.shields.io/badge/🍚-ff69b4?style=for-the-badge&logo=buy-me-a-coffee&logoColor=white)](./images/wechat_pay.jpg)
 
 # Ballroom-Dance-Audio-Pipeline
 
 ## 界面预览
 
-![程序界面截图](screenshot.png)
+![程序界面截图](./images/screenshot.png)
 
 # 🎵 舞曲排布工具 - 魅影制作
 > 智能舞曲播放列表排布工具，让每一场舞蹈都完美流畅
