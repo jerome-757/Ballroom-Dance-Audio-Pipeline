@@ -1,3 +1,32 @@
+import os
+import sys
+
+def setup_ffmpeg():
+    """自动设置 FFmpeg 环境变量，确保被调用的脚本能找到 ffmpeg"""
+    # 获取程序所在目录（兼容打包后和开发时）
+    if getattr(sys, 'frozen', False):
+        # 打包后的 .exe 所在目录
+        base_dir = os.path.dirname(sys.executable)
+    else:
+        # 开发时 .py 文件所在目录
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    # 检查同目录下是否有 ffmpeg 文件夹
+    ffmpeg_bin = os.path.join(base_dir, 'ffmpeg', 'bin')
+    ffmpeg_exe = os.path.join(ffmpeg_bin, 'ffmpeg.exe')
+    
+    if os.path.exists(ffmpeg_exe):
+        # 设置环境变量，这样 subprocess 调用的程序也能继承
+        os.environ['PATH'] = ffmpeg_bin + os.pathsep + os.environ.get('PATH', '')
+        os.environ['FFMPEG_PATH'] = ffmpeg_exe
+        print(f"[信息] 已加载 FFmpeg: {ffmpeg_exe}")
+    else:
+        # 如果没找到，给出友好提示但继续运行（可能用户手动配置了）
+        print(f"[信息] 未在 {ffmpeg_bin} 找到 ffmpeg.exe，将尝试使用系统 PATH")
+
+# ========== 自动初始化 ==========
+setup_ffmpeg()
+
 import random
 import os
 import glob

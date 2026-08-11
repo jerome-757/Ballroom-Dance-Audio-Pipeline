@@ -70,15 +70,16 @@ settings.local.json
 failed_files.json
 processing.log
 speech_cache/
+!D_motion_outro-bgm.mp3
 
 # ===== 只传文件夹名，不传内容 =====
-A_待整理音乐/
-A_已整理音乐/
-B_output_mp3/
-C_裁剪输出/
-D_output/
+A_待整理音乐/*
+A_已整理音乐/*
+B_output_mp3/*
+C_裁剪输出/*
+D_output/*
 
-# 但保留文件夹本身（Git会自动保留空目录结构）
+# 但保留文件夹本身（Git会自动保留空目录结构）(注意：.gitkeep文件要写入文件夹，且一定要在更改.gitignore文件前完成！)
 !A_待整理音乐/.gitkeep
 !A_已整理音乐/.gitkeep
 !B_output_mp3/.gitkeep
@@ -97,6 +98,7 @@ __pycache__/
 dist/
 build/
 *.log
+.spec
 
 # ===== 敏感信息 =====
 .env
@@ -115,8 +117,6 @@ Thumbs.db
 
 # ===== 大文件 =====
 *.mp3
-# 但单独允许这个文件上传
-!D_motion_outro-bgm.mp3
 *.wav
 *.flac
 *.zip
