@@ -4,7 +4,7 @@
 ![Tkinter](https://img.shields.io/badge/Tkinter-GUI-green.svg)
 ![Status](https://img.shields.io/badge/status-active-brightgreen.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Mac-lightgrey)
-[![捐赠支持](https://img.shields.io/badge/🍚-ff69b4?style=for-the-badge&logo=buy-me-a-coffee&logoColor=white)](./images/wechat_pay.jpg)
+[![捐赠支持](https://img.shields.io/badge/请我吃🍚-ff69b4?style=for-the-badge&logo=buy-me-a-coffee&logoColor=white)](./images/wechat_pay.jpg?raw=true)
 
 # Ballroom-Dance-Audio-Pipeline
 
