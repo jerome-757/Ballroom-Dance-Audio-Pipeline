@@ -70,6 +70,7 @@ settings.local.json
 failed_files.json
 processing.log
 speech_cache/
+zz/
 !D_motion_outro-bgm.mp3
 
 # ===== 只传文件夹名，不传内容 =====

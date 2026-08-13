@@ -28,6 +28,8 @@ import random
 import argparse
 from datetime import datetime
 from typing import Optional, List, Dict, Tuple
+import tkinter as tk
+from tkinter import messagebox
 
 # ============================================================
 # 🔧 用户可修改的配置参数
@@ -41,6 +43,7 @@ BGM_VOLUME = 0.2                 # 背景音乐音量（0.1 ~ 1.0）
 AUDIO_SOURCE_FOLDER = "C_裁剪输出"  # 音频源文件夹
 OUTPUT_SUFFIX = "-魅影制作"        # 输出文件名后缀
 OUTPUT_SUBFOLDER = "D_output"      # 输出子文件夹名
+EXTRACT_DANCE = False             # 是否提取舞种名称（默认False，会在运行时弹窗询问）
 
 # BGM 文件名（会自动在文件夹里找）
 BGM_NAMES = ["bgm.mp3", "bgm.MP3", "背景音乐.mp3", "background.mp3"]
@@ -627,29 +630,51 @@ async def process_one_file(
         filename = os.path.basename(input_file)
         name_no_ext = os.path.splitext(filename)[0]
         
-        # 识别舞蹈名称
+        # 识别舞蹈名称（仅在需要时）
         dance_name = extract_dance_name(filename)
-        logger.info(f"处理: {filename} -> {dance_name}")
+        logger.info(f"处理: {filename}")
         print(f"  🎵 {filename}")
-        print(f"  💃 舞蹈: {dance_name}")
         
         # 生成语音
         temp_speech = os.path.join(output_folder, "__temp_speech.mp3")
-        speech_text = f"下面请欣赏{dance_name}"
         
-        success = await tts_engine.generate_speech(speech_text, temp_speech)
-        
-        if not success or not os.path.exists(temp_speech) or os.path.getsize(temp_speech) == 0:
-            logger.error(f"语音生成失败: {filename}")
-            print(f"  ❌ 语音生成失败")
-            return False
-        
-        # 获取语音时长
-        speech_dur = get_audio_duration(temp_speech)
-        print(f"  ⏱️  语音时长: {speech_dur:.1f}秒")
-        
+        if EXTRACT_DANCE:
+            # 需要提取舞种名称
+            speech_text = f"下面请欣赏{dance_name}"
+            print(f"  💃 舞蹈: {dance_name}")
+            
+            success = await tts_engine.generate_speech(speech_text, temp_speech)
+            
+            if not success or not os.path.exists(temp_speech) or os.path.getsize(temp_speech) == 0:
+                logger.error(f"语音生成失败: {filename}")
+                print(f"  ❌ 语音生成失败")
+                return False
+            
+            # 获取语音时长
+            speech_dur = get_audio_duration(temp_speech)
+            print(f"  ⏱️  语音时长: {speech_dur:.1f}秒")
+        else:
+            # 不提取舞种名称，生成静音
+            print(f"  🔇 不提取舞种名称")
+            speech_dur = 0.1  # 设置一个很短的时长
+            # 创建一个静音文件
+            cmd_silence = [
+                'ffmpeg',
+                '-f', 'lavfi',
+                '-i', 'anullsrc=r=44100:cl=mono',
+                '-t', '0.1',
+                '-c:a', 'libmp3lame',
+                '-b:a', '320k',
+                '-y',
+                temp_speech
+            ]
+            subprocess.run(cmd_silence, capture_output=True, check=True)
+
         # 计算语音位置
-        if isinstance(SPEECH_POSITION, (int, float)):
+        if not EXTRACT_DANCE:
+            # 不提取舞种时，语音位置设为0
+            speech_start = 0
+        elif isinstance(SPEECH_POSITION, (int, float)):
             speech_start = SPEECH_POSITION
         elif SPEECH_POSITION == "start":
             speech_start = 0
@@ -659,8 +684,9 @@ async def process_one_file(
             speech_start = (BGM_TOTAL_DURATION - speech_dur) / 2
         
         speech_start = max(0, min(speech_start, BGM_TOTAL_DURATION - speech_dur))
-        print(f"  🎚️  语音在第 {speech_start:.1f} 秒开始")
-        
+        if EXTRACT_DANCE:
+            print(f"  🎚️  语音在第 {speech_start:.1f} 秒开始")
+
         # 准备输出文件
         input_ext = os.path.splitext(input_file)[1]
         output_file = os.path.join(output_folder, f"{name_no_ext}{OUTPUT_SUFFIX}{input_ext}")
@@ -801,6 +827,29 @@ async def main():
     print("🎵 音频处理工具 - 终极完整版")
     print("="*70)
     print(f"📅 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print()
+
+    # 弹窗询问是否提取舞种名称
+    global EXTRACT_DANCE
+    root = tk.Tk()
+    root.withdraw()  # 隐藏主窗口
+    
+    result = messagebox.askquestion(
+        "舞种提取",
+        "是否要提取舞种名称？\n\n点击【是】= 提取舞种名称\n点击【否】= 不提取舞种名称（默认）",
+        parent=root,
+        default='no'  # 设置默认按钮为"否"
+    )
+    
+    EXTRACT_DANCE = (result == 'yes')
+    root.destroy()
+    
+    if EXTRACT_DANCE:
+        print("✅ 已选择：提取舞种名称")
+        logger.info("用户选择：提取舞种名称")
+    else:
+        print("✅ 已选择：不提取舞种名称")
+        logger.info("用户选择：不提取舞种名称")
     print()
     
     # 检查依赖

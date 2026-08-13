@@ -34,6 +34,8 @@ import warnings
 import tkinter as tk
 import pandas as pd
 from tkinter import ttk, messagebox, scrolledtext, filedialog, simpledialog
+import openpyxl
+from openpyxl import load_workbook
 from collections import Counter
 warnings.filterwarnings('ignore')
 
@@ -60,6 +62,7 @@ class PlaylistApp:
         # ---------- 主布局：左右结构 ----------
         main_frame = tk.Frame(root)
         main_frame.pack(fill="both", expand=True, padx=10, pady=10)
+
         
         # -------- 左侧：控制面板（加宽） --------
         left_frame = tk.Frame(main_frame, width=580)
@@ -212,7 +215,7 @@ class PlaylistApp:
 
         # 功能配置列表
         func_configs = [
-            ('A', '质量筛选', self.func1),
+            ('A', '标签筛选', self.func1),
             ('B', '格式转换', self.func2),
             ('C', '时长裁剪', self.func3),
             ('D', '前缀添加', self.func4)
@@ -248,19 +251,44 @@ class PlaylistApp:
 
         # -------- 右侧：排布结果（适当缩小） --------
         right_frame = tk.Frame(main_frame, width=500)
-        right_frame.pack(side="right", fill="both", expand=True)
+        right_frame.pack(side="right", fill="both", expand=True, pady=(0, 0))
         right_frame.pack_propagate(False)
-        
+
         frame_result = tk.LabelFrame(right_frame, text="排布结果", padx=8, pady=5)
-        frame_result.pack(fill="both", expand=True)
-        
-        self.result_text = scrolledtext.ScrolledText(frame_result, height=28, font=("Courier", 9))
+        frame_result.pack(fill="both", expand=True, pady=(0, 30)) # ✅ expand=True 让它填满整个 right_frame  pady=(0, 30)底部预留保存按钮空间
+
+        # 创建一个容器来放置结果文本框和按钮
+        result_container = tk.Frame(frame_result)
+        result_container.pack(fill="both", expand=True)
+
+        self.result_text = scrolledtext.ScrolledText(result_container, height=28, font=("Courier", 9))
         self.result_text.pack(fill="both", expand=True)
-        
+
+        # ---------- 添加"保存排布结果"按钮（在结果框最下方中间） ----------
+        button_frame = tk.Frame(frame_result)
+        button_frame.pack(fill="x", pady=5)
+
+        self.btn_save_result = tk.Button(
+            button_frame, 
+            text="保存排布结果", 
+            command=self.save_result_to_excel,
+            bg="#2196F3", 
+            fg="white", 
+            font=("Arial", 10, "bold"),
+            padx=20, 
+            pady=5,
+            state="disabled"  # 初始禁用，找到结果后启用
+        )
+        self.btn_save_result.pack()
+
         # 状态
         self.searching = False
         self.data_loaded = False
-        
+        self.last_dance_list = None  # 存储最后一次生成的舞种列表
+        self.last_seq = None  # 存储最后一次生成的完整序列
+        self.last_max_attempts = 0  # 存储最后一次搜索次数
+        self.last_attempt = 0  # 存储最后一次成功搜索的尝试次数
+
         # 检查是否需要自动加载
         if os.path.exists(self.data_path.get()):
             self.load_data()
@@ -478,7 +506,7 @@ class PlaylistApp:
         self.btn_stop.config(state="disabled")
 
     def func1(self):
-        """质量筛选 - A_music_processor.py"""
+        """标签筛选 - A_music_processor.py"""
         try:
             import subprocess
             import os
@@ -503,7 +531,7 @@ class PlaylistApp:
                 # 构建命令
                 cmd = ["python", py_file] + params
                 subprocess.Popen(cmd)
-                messagebox.showinfo("质量筛选", f"已启动质量筛选程序\n匹配条件：{config_value}")
+                messagebox.showinfo("标签筛选", f"已启动标签筛选程序\n匹配条件：{config_value}")
             else:
                 messagebox.showerror("错误", f"找不到文件：{py_file}")
         except Exception as e:
@@ -599,7 +627,7 @@ class PlaylistApp:
                     "--volume", volume
                 ]
                 subprocess.Popen(cmd)
-                messagebox.showinfo("前缀添加", f"已启动前缀添加程序\nBGM时长：{duration}s  音量：{volume}\n语音位置：{final_position}")
+                messagebox.showinfo("前缀添加", f"已启动前缀添加程序\nBGM时长：{duration}s\n音量：{volume}\n语音位置：{final_position}")
             else:
                 messagebox.showerror("错误", f"找不到文件：{py_file}")
         except Exception as e:
@@ -611,7 +639,7 @@ class PlaylistApp:
         if code == 'A':
             # ===== 功能A的专用配置对话框 =====
             dialog = tk.Toplevel(self.root)
-            dialog.title("质量筛选配置")
+            dialog.title("标签筛选配置")
             dialog.geometry("350x280")
             
             # 弹窗居中
@@ -1053,6 +1081,11 @@ class PlaylistApp:
         self.btn_generate.config(state="disabled")
         self.btn_stop.config(state="normal")
         self.searching = True
+        # ===== 按钮触发弹窗新增的3行代码，开始新搜索时禁用保存按钮并清空之前的结果=====
+        self.btn_save_result.config(state="disabled")  # 禁用"保存排布结果"按钮
+        self.last_dance_list = None  # 清空之前保存的舞种列表
+        self.last_seq = None  # 清空之前保存的序列数据
+        # ===== 新增结束 =====
         self.result_text.delete(1.0, tk.END)
         self.result_text.insert(tk.END, "正在搜索，请稍候...\n")
         enabled = [k for k, v in active_rules.items() if v]
@@ -1070,6 +1103,7 @@ class PlaylistApp:
             return
         
         if attempt >= max_attempts:
+            # ... 失败处理 ...
             self.result_text.insert(tk.END, "\n" + "=" * 50 + "\n")
             self.result_text.insert(tk.END, f"❌ 搜索 {max_attempts} 次未找到合法解。\n")
             self.result_text.insert(tk.END, "建议操作：\n")
@@ -1088,7 +1122,11 @@ class PlaylistApp:
         
         seq = self.generate_sequence(active_rules, max_attempts=1)
         
+        # 增加将排布结果存储到表格：
         if seq is not None:
+            # ===== 搜索成功 =====
+            # 1. 保存结果
+            self.last_attempt = attempt  # 保存尝试次数（索引从0开始，实际尝试次数为 attempt+1）
             self.result_text.delete(1.0, tk.END)
             self.result_text.insert(tk.END, f"✅ 找到合法解！(尝试 {attempt+1} 次)\n")
             self.result_text.insert(tk.END, "-" * 50 + "\n")
@@ -1097,15 +1135,25 @@ class PlaylistApp:
             for i, (cat, dance, rhythm) in enumerate(seq, 1):
                 self.result_text.insert(tk.END, f"{i:<4} {cat:<8} {dance:<12} {rhythm:<4}\n")
             
-            # 舞种列输出
+            # 2. 显示结果,舞种列输出
             self.result_text.insert(tk.END, "\n" + "-" * 50 + "\n")
-            self.result_text.insert(tk.END, "【仅舞种列表】（复制下面这段到excel里使用）\n")
+            self.result_text.insert(tk.END, "【仅舞种列表】（可复制使用）\n")
             self.result_text.insert(tk.END, "-" * 50 + "\n")
             dance_list = [dance for _, dance, _ in seq]
             self.result_text.insert(tk.END, "、".join(dance_list) + "\n")
             self.result_text.insert(tk.END, "-" * 50 + "\n")
             self.result_text.insert(tk.END, f"共 {len(dance_list)} 首\n")
             
+            # 弹窗询问是否保存到Excel
+            # if messagebox.askyesno("保存结果", "是否将舞种排布结果保存到Excel文件？"):
+            # 保存当前结果到实例变量，供"保存排布结果"按钮使用
+            self.last_dance_list = dance_list
+            self.last_seq = seq
+            self.last_max_attempts = max_attempts
+            # 3. 启用保存按钮
+            self.btn_save_result.config(state="normal")  # 启用保存按钮
+
+            # ===== 新增：校验并显示结果 =====
             ok, errors = self.check_constraints(seq, active_rules)
             self.result_text.insert(tk.END, "\n" + "-" * 50 + "\n")
             if ok:
@@ -1115,14 +1163,123 @@ class PlaylistApp:
                 for e in errors[:10]:
                     self.result_text.insert(tk.END, f"  - {e}\n")
             
+            # 4. 更新进度标签和按钮状态
             self.progress_label.config(text=f"搜索成功！共尝试 {attempt+1} 次")
             self.btn_generate.config(state="normal")
             self.btn_stop.config(state="disabled")
             self.searching = False
-            return
+            return  # 关键：成功时直接返回，不再继续搜索
         
+        # 搜索失败：继续下一次搜索
         self.root.after(5, self._search_step, active_rules, attempt + 1, max_attempts)
 
+    def save_result_to_excel(self):
+        """保存排布结果到Excel（由按钮触发）"""
+        if self.last_dance_list is None:
+            messagebox.showwarning("提示", "没有可保存的排布结果，请先搜索！")
+            return
+        
+        try:
+            # 获取当前脚本所在目录
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            file_path = os.path.join(script_dir, "舞曲排布_示例.xlsx")
+            sheet_name = "排布结果"
+            
+            # 检查文件是否存在
+            if os.path.exists(file_path):
+                wb = load_workbook(file_path)
+            else:
+                wb = openpyxl.Workbook()
+                if 'Sheet' in wb.sheetnames:
+                    wb.remove(wb['Sheet'])
+            
+            # 获取或创建"排布结果"工作表
+            if sheet_name in wb.sheetnames:
+                ws = wb[sheet_name]
+            else:
+                ws = wb.create_sheet(sheet_name)
+            
+            # 检测第一个空列
+            col_idx = 1
+            while ws.cell(row=1, column=col_idx).value is not None:
+                col_idx += 1
+            
+            # 写入舞种列表
+            for i, dance in enumerate(self.last_dance_list, 1):
+                ws.cell(row=i, column=col_idx, value=dance)
+
+            # ---------- 写入生成条件到"条件记录"工作表 ----------
+            # 获取或创建"条件记录"工作表            
+            if "条件记录" in wb.sheetnames:
+                ws_conditions = wb["条件记录"]
+            else:
+                ws_conditions = wb.create_sheet("条件记录")
+            
+            # 获取列字母
+            col_letter = chr(64 + col_idx) if col_idx <= 26 else f"A{chr(64 + col_idx - 26)}"
+            
+            # 获取当前日期时间（月日时分）
+            import datetime
+            now = datetime.datetime.now()
+            datetime_str = now.strftime("%m月%d日%H时%M分")
+            
+            # 构建条件信息
+            fixed_pos_str = ""
+            if self.fixed_positions:
+                fixed_items = [f"{pos}={dance}" for pos, dance in sorted(self.fixed_positions.items())]
+                fixed_pos_str = "，".join(fixed_items)
+            else:
+                fixed_pos_str = "无固定位置"
+
+            # 规则信息
+            # active_rules = [key for key, var in self.rules.items() if var.get()](AttributeError: 'list' object has no attribute 'get')
+            active_rules = {key: var.get() for key, var in self.rules.items()}
+            rules_str = "、".join(active_rules) if active_rules else "无规则"
+
+            # 同舞种间隔值
+            gap_str = f"间隔{self.gap_value.get()}首" if self.rules['同舞种间隔'].get() else ""
+
+            # 最近的一次搜索次数
+            attempts_str = f"搜索{self.last_max_attempts}次"
+            # attempts_str = f"搜索{max_attempts}次"
+
+            # 功能配置信息
+            func_configs = []
+            if hasattr(self, 'config_values'):
+                for code in ['A', 'B', 'C', 'D']:
+                    if code in self.config_values:
+                        func_configs.append(f"{code}:{self.config_values[code].get()}")
+            func_str = "；".join(func_configs) if func_configs else "无功能配置"
+
+            # 组合所有条件信息
+            # condition_info = f"固定位置：{fixed_pos_str}；规则：{rules_str}；{gap_str}；{attempts_str}；功能配置：{func_str}"
+
+            # 在"条件记录"工作表中查找第一个空行（从第2行开始）
+            row_idx = 2
+            while ws_conditions.cell(row=row_idx, column=1).value is not None:
+                row_idx += 1   # 如果要跳行就改成2
+
+            # 写入条件记录（拆分到各列）
+            ws_conditions.cell(row=row_idx, column=1, value=datetime_str)       # A列：生成时间
+            ws_conditions.cell(row=row_idx, column=2, value=self.last_attempt + 1)        # B列：尝试次数
+            ws_conditions.cell(row=row_idx, column=3, value=col_letter )        # C列：结果列名
+            ws_conditions.cell(row=row_idx, column=4, value=fixed_pos_str)      # D列：固定位置
+            ws_conditions.cell(row=row_idx, column=5, value=gap_str)            # E列：舞种间隔
+            ws_conditions.cell(row=row_idx, column=6, value=rules_str)          # F列：应用规则
+            # ws_conditions.cell(row=row_idx, column=7, value=func_str)           # G列：功能配置
+
+            # 保存
+            wb.save(file_path)
+
+            messagebox.showinfo("保存成功", 
+                f"✅ 已保存到：\n{file_path}\n\n"
+                f"舞种列表：在{sheet_name}工作表 {col_letter}列（共{len(self.last_dance_list)}首）\n\n"
+                f"生成条件：在条件记录工作表 第{row_idx}行")   
+                        
+        except PermissionError:
+            messagebox.showerror("错误", "文件正在使用中，请关闭Excel文件后重试！")
+        except Exception as e:
+            messagebox.showerror("错误", f"保存失败：{str(e)}")
 
 # ---------- 启动 ----------
 if __name__ == "__main__":
