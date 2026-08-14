@@ -1249,7 +1249,7 @@ class PlaylistApp:
         self.result_text.insert("end", f"同舞种间隔值: {self.gap_value.get()}\n")
         self.result_text.insert("end", f"固定位置: {self.fixed_positions}\n")
         self.result_text.insert("end", f"最大搜索次数: {max_attempts}\n")
-        self.result_text.insert("end", "-" * 50 + "\n")
+        self.result_text.insert("end", "-" * 38 + "\n")
         self.root.update()
         
         self._search_step(active_rules, 0, max_attempts)
