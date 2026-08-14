@@ -3,3 +3,4 @@ gTTS==2.5.4
 mutagen==1.48.1
 pandas==2.3.0
 pyttsx3==2.99
+ttkbootstrap>=2.2.0
