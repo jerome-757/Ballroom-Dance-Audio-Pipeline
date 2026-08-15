@@ -1,5 +1,19 @@
 import os
 import sys
+import glob
+import random
+import warnings
+import threading
+import subprocess
+import pandas as pd
+import openpyxl
+from openpyxl import load_workbook
+import ttkbootstrap as ttk
+from ttkbootstrap.constants import *
+from ttkbootstrap import Style
+from ttkbootstrap import Messagebox
+from collections import Counter
+warnings.filterwarnings('ignore')
 
 def setup_ffmpeg():
     """自动设置 FFmpeg 环境变量，确保被调用的脚本能找到 ffmpeg"""
@@ -27,20 +41,6 @@ def setup_ffmpeg():
 # ========== 自动初始化 ==========
 setup_ffmpeg()
 
-import random
-import os
-import glob
-import warnings
-import pandas as pd
-import ttkbootstrap as ttk
-from ttkbootstrap.constants import *
-from ttkbootstrap import Style
-from ttkbootstrap import Messagebox
-import openpyxl
-from openpyxl import load_workbook
-from collections import Counter
-warnings.filterwarnings('ignore')
-
 # ---------- 全局数据 ----------
 DATA = []
 POOL = []
@@ -53,7 +53,7 @@ class PlaylistApp:
         
         # ---------- 窗口居中 ----------
         window_width = 1800
-        window_height = 1253
+        window_height = 1193
         screen_width = root.winfo_screenwidth()
         screen_height = root.winfo_screenheight()
         x = (screen_width - window_width) // 2
@@ -195,13 +195,19 @@ class PlaylistApp:
         frame_btn.grid(row=1, column=0, columnspan=2, pady=(10, 5))
 
         self.btn_generate = ttk.Button(frame_btn, text="开始搜索", command=self.run_search,
-                                    bootstyle="success", width=14)
-        self.btn_generate.pack(side="left", padx=(0, 10))
+                                    bootstyle="success", width=15)
+        self.btn_generate.pack(side="left", padx=(0, 5))
 
         self.btn_stop = ttk.Button(frame_btn, text="停止搜索", command=self.stop_search,
-                                bootstyle="danger", width=14)
+                                bootstyle="danger", width=15)
         self.btn_stop.pack(side="left")
         self.btn_stop.config(state="disabled")
+        self.btn_stop.pack(side="left", padx=(0, 5))
+        self.btn_stop.config(state="disabled")
+
+        self.btn_save_result = ttk.Button(frame_btn, text="保存结果", command=self.save_result_to_excel,
+                                       bootstyle="success", width=15, state="disabled")
+        self.btn_save_result.pack(side="left")
 
         # 状态信息条（第三行）
         self.progress_label = ttk.Label(frame_params, text="（注意：舞种排比和规则设定都要在合理范围内！）等待开始...", 
@@ -280,13 +286,13 @@ class PlaylistApp:
             func_btn.grid(row=idx+1, column=2, padx=2, pady=3)
             self.func_buttons.append(func_btn)
 
-        # -------- 右侧：排布结果 --------
+        # -------- 右侧：信息框 --------
         right_frame = ttk.Frame(main_frame)
         right_frame.grid(row=0, column=1, sticky="nsew")
         right_frame.columnconfigure(0, weight=1)
         right_frame.rowconfigure(0, weight=1)
 
-        frame_result = ttk.Labelframe(right_frame, text=" 排布结果 ", padding=(10, 8), bootstyle="primary")
+        frame_result = ttk.Labelframe(right_frame, text=" 信息框 ", padding=(10, 8), bootstyle="primary")
         frame_result.grid(row=0, column=0, sticky="nsew", pady=(0, 10))
         frame_result.columnconfigure(0, weight=1)
         frame_result.rowconfigure(0, weight=1)
@@ -294,20 +300,6 @@ class PlaylistApp:
         # 结果文本框
         self.result_text = ttk.ScrolledText(frame_result, height=30, font=("Courier", 9))
         self.result_text.grid(row=0, column=0, sticky="nsew")
-
-        # ---------- 保存排布结果按钮 ----------
-        button_frame = ttk.Frame(right_frame)
-        button_frame.grid(row=1, column=0, pady=(0, 5))
-
-        self.btn_save_result = ttk.Button(
-            button_frame, 
-            text="保存排布结果", 
-            command=self.save_result_to_excel,
-            bootstyle="success", 
-            width=20,
-            state="disabled"  # 初始禁用，找到结果后启用
-        )
-        self.btn_save_result.pack()
 
         # 状态
         self.searching = False
@@ -594,14 +586,10 @@ class PlaylistApp:
     def func1(self):
         """标签筛选 - A_music_processor.py"""
         try:
-            import subprocess
-            import os
-            
             # 获取配置值
             config_value = self.config_values['A'].get()
             
-            # 解析配置，生成参数
-            # 例如："标题 + 艺术家" 或 "标题 + 艺术家 + 专辑"
+            # 解析配置，生成参数  (例如："标题 + 艺术家" 或 "标题 + 艺术家 + 专辑")
             params = []
             if "标题" in config_value:
                 params.append("--title")
@@ -613,35 +601,100 @@ class PlaylistApp:
             script_dir = os.path.dirname(os.path.abspath(__file__))
             py_file = os.path.join(script_dir, "A_music_processor.py")
             
-            if os.path.exists(py_file):
-                # 构建命令
-                cmd = ["python", py_file] + params
-                subprocess.Popen(cmd)
-                Messagebox.show_info(
-                    title="标签筛选",  
-                    message=f"已启动标签筛选程序\n匹配条件：{config_value}",
-                    parent=self.root  
-                )
-
-            else:
+            if not os.path.exists(py_file):
                 Messagebox.show_error(
                     title="错误",
                     message=f"找不到文件：{py_file}",
                     parent=self.root
                 )
+                return
+            
+            # 构建命令
+            cmd = ["python", py_file] + params
+            
+            # 在结果区域显示启动信息
+            self.result_text.insert('end', f"▶️ 启动标签筛选程序\n")
+            self.result_text.see('end')
+            
+            # 在后台线程中运行
+            def run_process():
+                try:
+                    process = subprocess.Popen(
+                        cmd,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        encoding='utf-8',
+                        errors='replace',
+                        creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0,
+                        bufsize=1,
+                        universal_newlines=True
+                    )
+                    
+                    # 实时读取输出并显示
+                    for line in iter(process.stdout.readline, ''):
+                        if not line:
+                            break
+                        # 输出到终端
+                        print(line, end='', flush=True)
+                        # 输出到GUI
+                        self.root.after(0, self._append_result, line)
+                    
+                    process.stdout.close()
+                    return_code = process.wait()
+                    
+                    if return_code == 0:
+                        success_msg = f"\n✅ A程序执行完成！\n"
+                        print(success_msg, flush=True)
+                        self.root.after(0, self._append_result, success_msg)
+                        self.root.after(0, self._append_result, "=" * 30 + "\n")
+                    else:
+                        error_msg = f"\n❌ A程序执行失败（返回码：{return_code}）\n"
+                        print(error_msg, flush=True)
+                        self.root.after(0, self._append_result, error_msg)
+                        self.root.after(0, self._append_result, "=" * 30 + "\n")
+                        
+                except Exception as e:
+                    error_msg = f"\n❌ 执行异常：{str(e)}\n"
+                    print(error_msg, flush=True)
+                    self.root.after(0, self._append_result, error_msg)
+                    self.root.after(0, self._append_result, "=" * 30 + "\n")
+            
+            # 启动线程
+            thread = threading.Thread(target=run_process, daemon=True)
+            thread.start()
+            
+            # 延迟显示弹窗
+            self.root.after(100, lambda: Messagebox.show_info(
+                title="标签筛选",  
+                message=f"已启动标签筛选程序\n匹配条件：{config_value}",
+                parent=self.root  
+            ))
+            
         except Exception as e:
             Messagebox.show_error(
                 title="错误",
                 message=f"执行失败：{str(e)}",
                 parent=self.root
             )
+                
+        except Exception as e:
+            Messagebox.show_error(
+                title="错误",
+                message=f"执行失败：{str(e)}",
+                parent=self.root
+            )
+
+    # 这一段代码才是真正通过 _append_result() 方法实时显示子进程的输出。
+    def _append_result(self, text):
+        """追加输出到结果区域（线程安全）"""
+        self.result_text.insert('end', text)
+        self.result_text.see('end')
+        self.root.update_idletasks()
     
     def func2(self):
         """格式转换 - B_audio_converter.py"""
         try:
-            import subprocess
-            import os
-            
             # 获取配置值
             bitrate = self.config_values['B_bitrate'].get()
             use_vbr = self.config_values['B_use_vbr'].get()
@@ -651,41 +704,106 @@ class PlaylistApp:
             script_dir = os.path.dirname(os.path.abspath(__file__))
             py_file = os.path.join(script_dir, "B_audio_converter.py")
             
-            if os.path.exists(py_file):
-                # 构建命令
-                cmd = [
-                    "python", py_file,
-                    "--bitrate", bitrate,
-                    "--vbr" if use_vbr else "--cbr",
-                    "--vbr-quality", vbr_quality,
-                    "--workers", workers
-                ]
-                subprocess.Popen(cmd)
-                Messagebox.show_info(
-                    title="格式转换",  
-                    message=f"已启动格式转换程序\n比特率：{bitrate}  {'VBR' if use_vbr else 'CBR'}\n并发数：{workers}",
-                    parent=self.root  
-                )
-
-            else:
+            if not os.path.exists(py_file):
                 Messagebox.show_error(
                     title="错误",
                     message=f"找不到文件：{py_file}",
                     parent=self.root
                 )
+                return
+            
+            # 构建命令
+            cmd = [
+                "python", py_file,
+                "--bitrate", bitrate,
+                "--vbr" if use_vbr else "--cbr",
+                "--vbr-quality", vbr_quality,
+                "--workers", workers
+            ]
+            
+            # 在结果区域显示启动信息
+            self.result_text.insert('end', f"▶️ 启动格式转换程序\n")
+            self.result_text.see('end')
+            
+            # 在后台线程中运行
+            def run_process():
+                try:
+                    process = subprocess.Popen(
+                        cmd,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        encoding='utf-8',
+                        errors='replace',
+                        creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0,
+                        bufsize=1,
+                        universal_newlines=True
+                    )
+                    
+                    # 实时读取输出并显示
+                    for line in iter(process.stdout.readline, ''):
+                        if not line:
+                            break
+                        # 输出到终端
+                        print(line, end='', flush=True)
+                        # 输出到GUI
+                        self.root.after(0, self._append_result, line)
+                    
+                    process.stdout.close()
+                    return_code = process.wait()
+                    
+                    if return_code == 0:
+                        success_msg = f"\n✅ B程序执行完成！\n"
+                        print(success_msg, flush=True)
+                        self.root.after(0, self._append_result, success_msg)
+                        self.root.after(0, self._append_result, "=" * 30 + "\n")
+                    else:
+                        error_msg = f"\n❌ B程序执行失败（返回码：{return_code}）\n"
+                        print(error_msg, flush=True)
+                        self.root.after(0, self._append_result, error_msg)
+                        self.root.after(0, self._append_result, "=" * 30 + "\n")
+                    
+                except Exception as e:
+                    error_msg = f"\n❌ 执行异常：{str(e)}\n"
+                    print(error_msg, flush=True)
+                    self.root.after(0, self._append_result, error_msg)
+                    self.root.after(0, self._append_result, "=" * 30 + "\n")
+            
+            # 启动线程
+            thread = threading.Thread(target=run_process, daemon=True)
+            thread.start()
+            
+            # 延迟显示弹窗
+            self.root.after(100, lambda: Messagebox.show_info(
+                title="格式转换",  
+                message=f"已启动格式转换程序\n比特率：{bitrate}  {'VBR' if use_vbr else 'CBR'}\n并发数：{workers}",
+                parent=self.root  
+            ))
+                            
+        except Exception as e:
+            self.root.after(0, self._append_result, f"\n❌ 执行异常：{str(e)}\n")
+            self.root.after(0, self._append_result, "=" * 38 + "\n")
+            
+            thread = threading.Thread(target=run_process, daemon=True)
+            thread.start()
+                
         except Exception as e:
             Messagebox.show_error(
                 title="错误",
                 message=f"执行失败：{str(e)}",
                 parent=self.root
             )
+    
+    def _append_result(self, text):
+        """追加输出到结果区域（线程安全）"""
+        self.result_text.insert('end', text)
+        self.result_text.see('end')
+        self.root.update_idletasks()
+
 
     def func3(self):
         """时长裁剪 - C_crop_audio.py"""
         try:
-            import subprocess
-            import os
-            
             # 获取配置值
             fade_in = self.config_values['C_fade_in'].get()
             fade_out = self.config_values['C_fade_out'].get()
@@ -693,39 +811,97 @@ class PlaylistApp:
             script_dir = os.path.dirname(os.path.abspath(__file__))
             py_file = os.path.join(script_dir, "C_crop_audio.py")
             
-            if os.path.exists(py_file):
-                # 构建命令
-                cmd = [
-                    "python", py_file,
-                    "--fade-in", fade_in,
-                    "--fade-out", fade_out
-                ]
-                subprocess.Popen(cmd)
-                Messagebox.show_info(
-                    title="时长裁剪",  
-                    message=f"已启动时长裁剪程序\n淡入：{fade_in}s  淡出：{fade_out}s",
-                    parent=self.root  
-                )
-
-            else:
+            if not os.path.exists(py_file):
                 Messagebox.show_error(
                     title="错误",
                     message=f"找不到文件：{py_file}",
                     parent=self.root
                 )
+                return
+            
+            # 构建命令
+            cmd = [
+                "python", py_file,
+                "--fade-in", fade_in,
+                "--fade-out", fade_out
+            ]
+            
+            # 在结果区域显示启动信息
+            self.result_text.insert('end', f"▶️ 启动时长裁剪程序\n")
+            self.result_text.see('end')
+
+            # 在后台线程中运行
+            def run_process():
+                try:
+                    process = subprocess.Popen(
+                        cmd,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        encoding='utf-8',
+                        errors='replace',
+                        creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0,
+                        bufsize=1,
+                        universal_newlines=True
+                    )
+                    
+                    # 实时读取输出并显示
+                    for line in iter(process.stdout.readline, ''):
+                        if not line:
+                            break
+                        # 输出到终端
+                        print(line, end='', flush=True)
+                        # 输出到GUI
+                        self.root.after(0, self._append_result, line)
+                    
+                    process.stdout.close()
+                    return_code = process.wait()
+                    
+                    if return_code == 0:
+                        success_msg = f"\n✅ C程序执行完成！\n"
+                        print(success_msg, flush=True)
+                        self.root.after(0, self._append_result, success_msg)
+                        self.root.after(0, self._append_result, "=" * 30 + "\n")
+                    else:
+                        error_msg = f"\n❌ C程序执行失败（返回码：{return_code}）\n"
+                        print(error_msg, flush=True)
+                        self.root.after(0, self._append_result, error_msg)
+                        self.root.after(0, self._append_result, "=" * 30 + "\n")
+                        
+                except Exception as e:
+                    error_msg = f"\n❌ 执行异常：{str(e)}\n"
+                    print(error_msg, flush=True)
+                    self.root.after(0, self._append_result, error_msg)
+                    self.root.after(0, self._append_result, "=" * 30 + "\n")
+            
+            # 启动线程
+            thread = threading.Thread(target=run_process, daemon=True)
+            thread.start()
+            
+            # 延迟显示弹窗
+            self.root.after(100, lambda: Messagebox.show_info(
+                title="时长裁剪",  
+                message=f"已启动时长裁剪程序\n淡入：{fade_in}s  淡出：{fade_out}s",
+                parent=self.root  
+            ))
+
         except Exception as e:
             Messagebox.show_error(
                 title="错误",
                 message=f"执行失败：{str(e)}",
                 parent=self.root
             )
+    
+    def _append_result(self, text):
+        """追加输出到结果区域（线程安全）"""
+        self.result_text.insert('end', text)
+        self.result_text.see('end')
+        self.root.update_idletasks()
+
 
     def func4(self):
         """前缀添加 - D_add_audio.py"""
         try:
-            import subprocess
-            import os
-            
             # 获取配置值
             duration = self.config_values['D_duration'].get()
             start = self.config_values['D_start'].get()
@@ -742,34 +918,95 @@ class PlaylistApp:
             script_dir = os.path.dirname(os.path.abspath(__file__))
             py_file = os.path.join(script_dir, "D_add_audio.py")
             
-            if os.path.exists(py_file):
-                # 构建命令
-                cmd = [
-                    "python", py_file,
-                    "--duration", duration,
-                    "--start", start,
-                    "--position", final_position,
-                    "--volume", volume
-                ]
-                subprocess.Popen(cmd)
-                Messagebox.show_info(
-                    title="前缀添加",  
-                    message=f"已启动前缀添加程序\nBGM时长：{duration}s\n音量：{volume}\n语音位置：{final_position}",
-                    parent=self.root  
-                )
-
-            else:
+            if not os.path.exists(py_file):
                 Messagebox.show_error(
                     title="错误",
                     message=f"找不到文件：{py_file}",
                     parent=self.root
                 )
+                return
+            
+            # 构建命令
+            cmd = [
+                "python", py_file,
+                "--duration", duration,
+                "--start", start,
+                "--position", final_position,
+                "--volume", volume
+            ]
+            
+            # 在结果区域显示启动信息
+            self.result_text.insert('end', f"▶️ 启动前缀添加程序\n")
+            self.result_text.see('end')
+
+            # 在后台线程中运行
+            def run_process():
+                try:
+                    process = subprocess.Popen(
+                        cmd,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        encoding='utf-8',
+                        errors='replace',
+                        creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0,
+                        bufsize=1,  # 行缓冲
+                        universal_newlines=True
+                    )
+                    
+                    # 实时读取输出并显示
+                    for line in iter(process.stdout.readline, ''):
+                        if not line:
+                            break
+                        # 输出到终端
+                        print(line, end='', flush=True)
+                        # 输出到GUI
+                        self.root.after(0, self._append_result, line)
+                    
+                    process.stdout.close()
+                    return_code = process.wait()
+                    
+                    if return_code == 0:
+                        success_msg = f"\n✅ D程序执行完成！\n"
+                        print(success_msg, flush=True)
+                        self.root.after(0, self._append_result, success_msg)
+                        self.root.after(0, self._append_result, "=" * 30 + "\n")
+                    else:
+                        error_msg = f"\n❌ D程序执行失败（返回码：{return_code}）\n"
+                        print(error_msg, flush=True)
+                        self.root.after(0, self._append_result, error_msg)
+                        self.root.after(0, self._append_result, "=" * 30 + "\n")
+                        
+                except Exception as e:
+                    error_msg = f"\n❌ 执行异常：{str(e)}\n"
+                    print(error_msg, flush=True)
+                    self.root.after(0, self._append_result, error_msg)
+                    self.root.after(0, self._append_result, "=" * 30 + "\n")
+
+            # 先启动线程
+            thread = threading.Thread(target=run_process, daemon=True)
+            thread.start()
+
+            # 然后显示弹窗（非阻塞方式）
+            self.root.after(100, lambda: Messagebox.show_info(
+                title="前缀添加",  
+                message=f"已启动前缀添加程序\nBGM时长：{duration}s\n音量：{volume}\n语音位置：{final_position}",
+                parent=self.root  
+            ))
+
         except Exception as e:
             Messagebox.show_error(
                 title="错误",
                 message=f"执行失败：{str(e)}",
                 parent=self.root
             )
+    
+    def _append_result(self, text):
+        """追加输出到结果区域（线程安全）"""
+        self.result_text.insert('end', text)
+        self.result_text.see('end')
+        self.root.update_idletasks()
+
 
     def edit_config(self, code):
         """编辑配置 - 根据代号弹出不同的配置对话框"""
@@ -1237,7 +1474,7 @@ class PlaylistApp:
         self.searching = True
 
         # ===== 按钮触发弹窗新增的3行代码，开始新搜索时禁用保存按钮并清空之前的结果=====
-        self.btn_save_result.config(state="disabled")  # 禁用"保存排布结果"按钮
+        self.btn_save_result.config(state="disabled")  # 禁用"保存结果"按钮
         self.last_dance_list = None  # 清空之前保存的舞种列表
         self.last_seq = None  # 清空之前保存的序列数据
         # ===== 新增结束 =====
@@ -1302,7 +1539,7 @@ class PlaylistApp:
             
             # 弹窗询问是否保存到Excel
             # if messagebox.askyesno("保存结果", "是否将舞种排布结果保存到Excel文件？"):
-            # 保存当前结果到实例变量，供"保存排布结果"按钮使用
+            # 保存当前结果到实例变量，供"保存结果"按钮使用
             self.last_dance_list = dance_list
             self.last_seq = seq
             self.last_max_attempts = max_attempts
@@ -1331,7 +1568,7 @@ class PlaylistApp:
         self.root.after(5, self._search_step, active_rules, attempt + 1, max_attempts)
 
     def save_result_to_excel(self):
-        """保存排布结果到Excel（由按钮触发）"""
+        """保存结果到Excel（由按钮触发）"""
         if self.last_dance_list is None:
             Messagebox.show_warning(
                 title="提示",

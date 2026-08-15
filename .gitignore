@@ -72,6 +72,7 @@ processing.log
 speech_cache/
 zz/
 !D_motion_outro-bgm.mp3
+CleanFile.bat
 
 # ===== 只传文件夹名，不传内容 =====
 A_待整理音乐/*
